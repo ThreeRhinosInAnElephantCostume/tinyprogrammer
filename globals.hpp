@@ -12,7 +12,7 @@ namespace PIN
     constexpr uint8 SDO = 12;
     constexpr uint8 POWER = 16;
     constexpr uint8 PULSE = 13;
-    constexpr uint8 HIGHVOLT = 11;
+    constexpr uint8 HIGHVOLT = 18;
 }
 namespace ADC
 {

@@ -12,5 +12,10 @@
     "buildTarget" : {
       "visibility": "hidden"
                },
-     },
+    },
+    "files.associations": {
+      "string": "cpp",
+      "functional": "cpp",
+      "cstring": "cpp"
+    },
 }

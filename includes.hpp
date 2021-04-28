@@ -27,6 +27,8 @@
 #include "hardware/clocks.h"
 #include "hardware/structs/pll.h"
 #include "hardware/structs/clocks.h"
+#include "hardware/pwm.h"
+#include "hardware/watchdog.h"
 
 #include "tusb.h"
 #include "tusb_config.h"
