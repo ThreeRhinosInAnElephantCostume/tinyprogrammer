@@ -22,7 +22,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(tinyprogrammer tinyprogrammer.cpp boost.cpp core1.cpp)
+add_executable(tinyprogrammer tinyprogrammer.cpp boost.cpp core1.cpp usb_descriptors.c usbcomms.cpp)
 
 pico_set_program_name(tinyprogrammer "tinyprogrammer")
 pico_set_program_version(tinyprogrammer "0.1")

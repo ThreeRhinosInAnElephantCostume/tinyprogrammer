@@ -1,12 +1,16 @@
 #include "hmain.hpp"
-void PANIC()
+void disable_power()
 {
-    panicnow = true;
     gpio_put(PIN::HIGHVOLT, 0);
     gpio_put(PIN::POWER, 0);
     pwm_set_enabled(pwm_gpio_to_slice_num(PIN::PULSE), false);
     sleep_us(1);
     gpio_put(PIN::PULSE, 0);
+}
+void PANIC()
+{
+    panicnow = true;
+    disable_power();
     watchdog_enable(0, false);
     while(true)
     {
@@ -75,18 +79,18 @@ void tick_power()
     pwm_set_gpio_level(PIN::PULSE, (uint16)duty);
 
     
-    if(DEBUG)
-    {
-        EVERY_N(1000)
-        {
-            clear_console();
-            printf("V: %.3f\n", V);
-            printf("VBUS: %.3f\n", VBUSV);
-            printf("duty: %i\n", duty);
-            printf("change: %i\n", change);
-            printf("is_power_safe: %s\n", (is_power_safe)? "true": "false");
-        }
-    }
+    // if(DEBUG)
+    // {
+    //     EVERY_N(1000)
+    //     {
+    //         clear_console();
+    //         printf("V: %.3f\n", V);
+    //         printf("VBUS: %.3f\n", VBUSV);
+    //         printf("duty: %i\n", duty);
+    //         printf("change: %i\n", change);
+    //         printf("is_power_safe: %s\n", (is_power_safe)? "true": "false");
+    //     }
+    // }
 
 }
 void init_power_control()

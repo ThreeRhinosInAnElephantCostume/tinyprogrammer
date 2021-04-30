@@ -32,3 +32,4 @@
 
 #include "tusb.h"
 #include "tusb_config.h"
+#include "bsp/board.h"

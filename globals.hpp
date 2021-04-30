@@ -41,6 +41,11 @@ namespace BOOST
     constexpr float VBUS_MAXIMUM = 5.4f;
     constexpr float VBUS_MINIMUM = 4.6f;
 }
+namespace MULTICORE
+{
+    constexpr uint32 FAILURE_CODE = 666;
+}
+
 inline uint8_t usbmemory[1024];
 inline uint8_t poll[2];
 inline bool is_power_safe = false;

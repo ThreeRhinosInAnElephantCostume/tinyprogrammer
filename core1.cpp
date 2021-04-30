@@ -6,6 +6,19 @@ void core1_main()
     init_power_control();
     while(true)
     {
+        while(multicore_fifo_rvalid())
+        {
+            uint code = multicore_fifo_pop_blocking();
+            switch(code)
+            {
+                case MULTICORE::FAILURE_CODE:
+                {
+                    disable_power();
+                    return;
+                    break;
+                }
+            }
+        }
         watchdog_update();
         tick_power();
     }
