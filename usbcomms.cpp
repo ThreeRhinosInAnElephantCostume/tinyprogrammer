@@ -39,7 +39,7 @@ struct __attribute__((__packed__)) echo : command
 };
 void usb_TX(response res)
 {
-    tud_cdc_write((void*)&res, sizeof(res));
+    tud_vendor_write((void*)&res, sizeof(res));
 }
 void usb_TX(uint8_t errcode)
 {
@@ -84,10 +84,10 @@ response cmd_echo(void* data)
 }
 void usb_task()
 {
-    if(!tud_cdc_available())
+    if(!tud_vendor_available())
         return;
     uint8_t data[64];
-    tud_cdc_read(&data, 64);
+    tud_vendor_read(&data, 64);
     command* rcmd = (command*)data;
     std::vector<std::function<response(void* data)>> fs = 
     {

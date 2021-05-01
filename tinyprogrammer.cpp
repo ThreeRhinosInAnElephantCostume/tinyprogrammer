@@ -3,6 +3,7 @@
 int main()
 {
     stdio_init_all();
+    board_init();
 
     if(watchdog_caused_reboot() && !DEBUG)
     {
@@ -15,7 +16,7 @@ int main()
         while(true)
         {
             sleep_ms(100);
-            gpio_put(PIN::LED, !b);
+            gpio_put(PIN::LED, b = !b);
         }
     }
 
@@ -26,7 +27,6 @@ int main()
 
     multicore_launch_core1(core1_main);
 
-    board_init();
     tusb_init();
 
     puts("starting tinyprogrammer");

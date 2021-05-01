@@ -2,7 +2,8 @@
 
 void core1_main()
 {
-    watchdog_enable(10, true);
+    if constexpr(DEBUG)
+        watchdog_enable(10, true);
     init_power_control();
     while(true)
     {
