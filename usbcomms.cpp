@@ -1,12 +1,16 @@
 #include "hmain.hpp"
 enum class USB_RESPONSES
 {
-    OK = 0,
-    INVALID_COMMAND = 1,
+    RESERVED = 0, // in effect, the first byte of the return message will only be zero if something goes wrong
+    OK = 1,
+    INVALID_COMMAND = 2,
 };
 enum class CMD
 {
-    ECHO,
+    ECHO=0,
+
+    POWER_ON,
+    POWER_OFF,
 
     CHECK,
 
@@ -21,10 +25,12 @@ enum class CMD
 
     READ_FUSES,
     WRITE_FUSES,
+
+    READ_HASH_DATA,
 };
 struct __attribute__((__packed__)) response
 {
-    uint8_t errcode = 0;
+    uint8_t errcode = (uint8_t)USB_RESPONSES::OK;
     uint8_t len = 0;
     uint8_t data[62] = {0};
 };
@@ -77,7 +83,7 @@ response cmd_echo(void* data)
 {
     echo* dt = (echo*)data;
     response res;
-    res.errcode = 0;
+    res.errcode = (uint8_t)USB_RESPONSES::OK;
     res.len = dt->len;
     memcpy(res.data, dt->text, dt->len);
     return res;

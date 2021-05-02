@@ -46,8 +46,9 @@ namespace MULTICORE
     constexpr uint32 FAILURE_CODE = 666;
 }
 
-inline uint8_t usbmemory[1024];
-inline uint8_t poll[2];
+inline uint8_t usbmemory[1 << 16];
+
+
 inline bool is_power_safe = false;
 inline float boostvoltage = 0.0f;
 
