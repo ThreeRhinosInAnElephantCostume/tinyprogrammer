@@ -45,6 +45,59 @@ namespace MULTICORE
 {
     constexpr uint32 FAILURE_CODE = 666;
 }
+namespace CHIPS
+{
+    enum class CHIP_ID
+    {
+        ERR,
+        ATTINY25,
+        ATTINY45,
+        ATTINY85
+    };
+    struct __attribute__((__packed__)) ChipInfo
+    {
+        CHIP_ID id : 8;
+
+        uint signature;
+
+        uint8 word_bytes;
+
+        uint16 flash_bytes;
+        uint16 flash_words;
+
+        uint8 flash_page_bytes;
+        uint8 flash_page_words;
+        uint8 flash_page_num;
+
+        uint16 eeprom_bytes;
+        uint8 eeprom_page_bytes;
+        uint8 eeprom_page_num;
+
+        constexpr ChipInfo(CHIP_ID id, uint signature, uint8 word_bytes, uint16 flash_words, uint16 flash_page_words, 
+            uint8 eeprom_page_bytes, uint8 eeprom_page_num)
+        {
+            this->signature = signature;
+            this->id = id;
+            this->word_bytes = word_bytes;
+            this->flash_words = flash_words;
+            this->flash_page_words = flash_page_words;
+            this->eeprom_page_bytes = eeprom_page_bytes;
+            this->eeprom_page_num = eeprom_page_num;
+
+            this->flash_bytes = flash_words * word_bytes;
+            this->flash_page_bytes = flash_page_words * word_bytes;
+            this->flash_page_num = flash_words / flash_page_words;
+
+            this->eeprom_bytes = eeprom_page_bytes * eeprom_page_num;
+        }
+    };
+    constexpr ChipInfo infos[] = 
+    {
+        {CHIP_ID::ATTINY25, 0x1E9108, 2, 1024, 16, 4, 32},
+        {CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
+        {CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
+    };
+}
 
 inline uint8_t usbmemory[1 << 16];
 
@@ -55,3 +108,5 @@ inline float boostvoltage = 0.0f;
 inline bool chippowered = false;
 
 inline bool panicnow = false;
+
+inline PIO progpio = pio0;

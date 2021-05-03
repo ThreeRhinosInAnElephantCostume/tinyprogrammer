@@ -10,6 +10,7 @@
 #include <functional>
 #include <cstring>
 #include <unordered_map>
+#include <memory>
 
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
@@ -29,7 +30,10 @@
 #include "hardware/structs/clocks.h"
 #include "hardware/pwm.h"
 #include "hardware/watchdog.h"
+#include "hardware/pio.h"
 
 #include "tusb.h"
 #include "tusb_config.h"
 #include "bsp/board.h"
+
+#include "hvp.pio.h"

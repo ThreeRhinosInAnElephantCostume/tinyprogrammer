@@ -2,6 +2,8 @@
 #include "includes.hpp"
 #include "pico/MyPicoLib.hpp"
 #include "globals.hpp"
+#include "hvp.hpp"
+#include "usbcomms.hpp"
 void disable_power();
 inline void gracefulfailure()
 {
@@ -20,4 +22,3 @@ inline void gracefulfailure()
 void tick_power();
 void init_power_control();
 void core1_main();
-void usb_task();

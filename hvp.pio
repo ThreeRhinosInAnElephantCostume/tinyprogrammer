@@ -1,0 +1,26 @@
+; OUT
+; 0 - SDI
+; 1 - SII
+
+; IN
+; 0 - SDO
+
+; SIDE
+; 0 - SCI
+
+.program hvp
+.side_set 1
+
+.wrap_target
+    set x, 11
+    pull block
+    bitloop:
+        mov y, osr  
+        out null, 10    side 0
+        out pins, 2
+        mov osr, y
+        out pins, 1     side 1
+        in pins, 1
+        jmp x-- bitloop
+    push block
+.wrap
