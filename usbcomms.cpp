@@ -47,8 +47,19 @@ Response cmd_echo(void* data)
     memcpy(res.data, dt->text, dt->len);
     return res;
 }
-Response cmd_poweron(void* data)
+Response cmd_prog_ready(void* data)
 {
+    return Response(USB_RESPONSES::OK, 1, &is_power_safe);
+}
+Response cmd_chip_powered(void* data)
+{
+    Response res{USB_RESPONSES::OK, 1};
+    res.data[0] = !!chippowered;
+    return res;
+}
+Response cmd_power_on(void* data)
+{
+    chip_erased = false;
     hvp = nullptr;
     if(!is_power_safe)
     {
@@ -67,7 +78,7 @@ Response cmd_poweron(void* data)
     chippowered = true;
     return Response(USB_RESPONSES::OK);
 }
-Response cmd_poweroff(void* data)
+Response cmd_power_off(void* data)
 {
     if(!chippowered)
     {
@@ -132,7 +143,7 @@ Response cmd_check(void* data)
 
     // parsing the sginature bytes
 
-    uint32 signature = (*((uint32_t*)chip_desc->signature)) >> 8;
+    volatile uint32 signature = (*((uint32_t*)chip_desc->signature)) >> 8;
     for(uint i = 0; i < ArraySize(CHIPS::infos); i++)
     {
         auto info = CHIPS::infos[i];
@@ -150,21 +161,52 @@ Response cmd_check(void* data)
 
     return Response(USB_RESPONSES::OK, sizeof(ChipDesc), chip_desc.get());
 }
-Response cmd_write_data(void* data)
+Response cmd_chip_erase(void* data)
 {
-
+    returnifnotsetup();
+    chip_erased = true;
 }
 Response cmd_read_data(void* data)
 {
-
+    auto cmd = (ReadData*)data;
+    if(cmd->len > 60)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+    if(cmd->len + cmd->address < cmd->address)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address);
+}
+Response cmd_write_data(void* data)
+{
+    auto cmd = (WriteData*)data;
+    if(cmd->len > 60)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+    if(cmd->len + cmd->address < cmd->address)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    memcpy(usbmemory + cmd->address, cmd->data, cmd->len);
+    return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address); // return for potential validation
+}
+Response cmd_read_hash_data(void* data)
+{
+    returnifnotsetup();
 }
 Response cmd_read_flash(void* data)
 {
     returnifnotsetup();
+
 }
 Response cmd_write_flash(void* data)
 {
     returnifnotsetup();
+    if(!chip_erased)
+        return Response(USB_RESPONSES::NOTERASED);
 }
 Response cmd_read_eeprom(void* data)
 {
@@ -173,6 +215,8 @@ Response cmd_read_eeprom(void* data)
 Response cmd_write_eeprom(void* data)
 {
     returnifnotsetup();
+    if(!chip_erased)
+        return Response(USB_RESPONSES::NOTERASED);
 }
 Response cmd_read_fuses(void* data)
 {
@@ -181,16 +225,6 @@ Response cmd_read_fuses(void* data)
 Response cmd_write_fuses(void* data)
 {
     returnifnotsetup();
-}
-Response cmd_read_hash_data(void* data)
-{
-    returnifnotsetup();
-}
-Response cmd_powered(void* data)
-{
-    Response res{USB_RESPONSES::OK, 1};
-    res.data[0] = !!chippowered;
-    return res;
 }
 
 void usb_task()
@@ -202,7 +236,30 @@ void usb_task()
     Command* rcmd = (Command*)data;
     std::vector<std::function<Response(void* data)>> fs = 
     {
-        cmd_echo
+        cmd_echo,
+
+        cmd_prog_ready,
+        cmd_chip_powered,
+
+        cmd_power_on,
+        cmd_power_off,
+        
+        cmd_check,
+
+        cmd_chip_erase,
+        
+        cmd_read_data,
+        cmd_write_data,
+        cmd_read_hash_data,
+
+        cmd_read_flash,
+        cmd_write_flash,
+
+        cmd_read_eeprom,
+        cmd_write_eeprom,
+
+        cmd_read_fuses,
+        cmd_write_fuses
     };
     Response res;
     if(rcmd->rcmd >= fs.size())
