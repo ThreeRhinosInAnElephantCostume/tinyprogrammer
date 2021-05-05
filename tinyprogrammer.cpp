@@ -20,16 +20,20 @@ int main()
         }
     }
 
-    init_out({ PIN::POWER, PIN::SCI, PIN::SDI, PIN::SII, PIN::LED }, false);
+    init_out({ PIN::POWER, PIN::HIGHVOLT, PIN::LED }, false);
     init_in({ PIN::SDO });
 
     gpio_put(PIN::LED, 1);
 
+    printpower = true;
     multicore_launch_core1(core1_main);
+    while(!is_power_safe);
+    printpower = false;
+    printf("\npower safe at %.3f\n", boostvoltage);
+
+    puts("starting tinyprogrammer\n");
 
     tusb_init();
-
-    puts("starting tinyprogrammer");
 
     while (true)
     {

@@ -6,7 +6,7 @@
 
 namespace PIN
 {
-    constexpr uint8 SCI = 18;
+    constexpr uint8 SCI = 17;
     constexpr uint8 SDI = 15;
     constexpr uint8 SII = 14;
     constexpr uint8 SDO = 12;
@@ -25,7 +25,7 @@ namespace BOOST
 {
     constexpr uint8 DIVIDER = 1;
     constexpr uint16 WRAP = 512;
-    constexpr uint16 MAX_DUTY = WRAP*0.8;
+    constexpr uint16 MAX_DUTY = WRAP*0.7;
     constexpr uint16 MIN_DUTY = 0;
     constexpr uint16 DEFAULT_DUTY = MIN_DUTY;
     constexpr uint16 MINCHANGE = 1;
@@ -47,6 +47,7 @@ namespace MULTICORE
 }
 namespace CHIPS
 {
+    constexpr float HVP_CLKDIV = 50.0f;
     enum class CHIP_ID
     {
         ERR,
@@ -72,8 +73,11 @@ namespace CHIPS
         uint16 eeprom_bytes;
         uint8 eeprom_page_bytes;
         uint8 eeprom_page_num;
+        ChipInfo()
+        {
 
-        constexpr ChipInfo(CHIP_ID id, uint signature, uint8 word_bytes, uint16 flash_words, uint16 flash_page_words, 
+        }
+        ChipInfo(CHIP_ID id, uint signature, uint8 word_bytes, uint16 flash_words, uint16 flash_page_words, 
             uint8 eeprom_page_bytes, uint8 eeprom_page_num)
         {
             this->signature = signature;
@@ -91,13 +95,14 @@ namespace CHIPS
             this->eeprom_bytes = eeprom_page_bytes * eeprom_page_num;
         }
     };
-    constexpr ChipInfo infos[] = 
+    inline ChipInfo infos[] = 
     {
         {CHIP_ID::ATTINY25, 0x1E9108, 2, 1024, 16, 4, 32},
         {CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
         {CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
     };
 }
+
 
 inline uint8_t usbmemory[1 << 16];
 
@@ -110,3 +115,5 @@ inline bool chippowered = false;
 inline bool panicnow = false;
 
 inline PIO progpio = pio0;
+
+inline bool printpower = false;

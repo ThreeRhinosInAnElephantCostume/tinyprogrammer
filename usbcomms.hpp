@@ -4,24 +4,36 @@ enum class USB_RESPONSES
 {
     RESERVED = 0, // in effect, the first byte of the return message will only be zero if something goes wrong
     OK = 1,
-    INVALID_COMMAND = 2,
-    FAILURE=3,
-    NOTREADY = 4,
-    NOTPOWERED = 5,
-    NOTCHECKED = 6,
-    CHIPFAULT = 7,
+    // cmd errors
+    INVALID_COMMAND,
+    INVALID_ARGUMENT,
+    INVALID_RANGE, // out of range, etc
+    // hardware errors
+    FAILURE,
+    CHIPFAULT,
+    // logic errors
+    NOTREADY,
+    NOTPOWERED,
+    NOTCHECKED,
+    NOTERASED
 };
 enum class CMD
 {
     ECHO=0,
 
+    PROG_READY,
+    CHIP_POWERED,
+
     POWER_ON,
     POWER_OFF,
 
     CHECK,
+    
+    CHIP_ERASE,
 
     READ_DATA,
     WRITE_DATA,
+    READ_HASH_DATA,
 
     READ_FLASH, 
     WRITE_FLASH,
@@ -32,8 +44,7 @@ enum class CMD
     READ_FUSES,
     WRITE_FUSES,
 
-    READ_HASH_DATA,
-    POWERED,
+
 };
 struct __attribute__((__packed__)) ChipDesc 
 {
@@ -77,14 +88,40 @@ struct __attribute__((__packed__)) Response
 };
 struct __attribute__((__packed__)) Command
 {
-    uint8_t rcmd;
+    uint8 rcmd;
 };
 struct __attribute__((__packed__)) Echo : Command
 {
-    uint8_t len;
+    uint8 len;
     const char text[62];
 };
+struct __attribute__((__packed__)) ReadData : Command // up to 60 bytes at a time
+{
+    uint16 address;
+    uint8 len;
+};
+struct __attribute__((__packed__)) WriteData : Command // up to 60 bytes at a time
+{
+    uint16 address;
+    uint8 len;
+    uint8 data[60];
+
+};
+struct __attribute__((__packed__)) HashData : Command // up to 60 bytes at a time
+{
+    uint16 address;
+    uint8 len;
+};
+struct __attribute__((__packed__)) ReadFlash : Command // up to 60 bytes at a time
+{
+    uint16 startpage;
+    uint16 npages;
+    uint16 destination;
+};
+
 void usb_task();
 
-inline std::unique_ptr<HVP> hvp = nullptr; 
-inline std::unique_ptr<ChipDesc> chip_desc = nullptr;
+inline std::shared_ptr<HVP> hvp = nullptr; 
+inline std::shared_ptr<ChipDesc> chip_desc = nullptr;
+
+inline bool chip_erased = false;

@@ -11,6 +11,10 @@ void PANIC()
 {
     panicnow = true;
     disable_power();
+    gpio_put(PIN::HIGHVOLT, 0);
+    gpio_put(PIN::POWER, 0);
+    if(DEBUG)
+        printf("PANIC!!\n");
     watchdog_enable(0, false);
     while(true)
     {
@@ -59,7 +63,7 @@ void tick_power()
     }
     else
         vboostsafe = true;
-    if(vboostsafe && vbussafe)
+    if(vboostsafe && vbussafe && gettime() > 1000*1000)
         safe_power();
     boostvoltage = V;
     uint16_t change = std::min(BOOST::MAXCHANGE,
@@ -79,18 +83,18 @@ void tick_power()
     pwm_set_gpio_level(PIN::PULSE, (uint16)duty);
 
     
-    // if(DEBUG)
-    // {
-    //     EVERY_N(1000)
-    //     {
-    //         clear_console();
-    //         printf("V: %.3f\n", V);
-    //         printf("VBUS: %.3f\n", VBUSV);
-    //         printf("duty: %i\n", duty);
-    //         printf("change: %i\n", change);
-    //         printf("is_power_safe: %s\n", (is_power_safe)? "true": "false");
-    //     }
-    // }
+    if(DEBUG && printpower)
+    {
+        EVERY_N(1000)
+        {
+            clear_console();
+            printf("V: %.3f\n", V);
+            printf("VBUS: %.3f\n", VBUSV);
+            printf("duty: %i\n", duty);
+            printf("change: %i\n", change);
+            printf("is_power_safe: %s\n", (is_power_safe)? "true": "false");
+        }
+    }
 
 }
 void init_power_control()

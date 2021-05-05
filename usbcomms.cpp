@@ -41,11 +41,8 @@ Response create_response(USB_RESPONSES errcode=USB_RESPONSES::OK, Ts... data)
 Response cmd_echo(void* data)
 {
     Echo* dt = (Echo*)data;
-    Response res;
-    res.errcode = (uint8_t)USB_RESPONSES::OK;
-    res.len = dt->len;
-    memcpy(res.data, dt->text, dt->len);
-    return res;
+    printf("echoing %s\n", dt->text);
+    return Response(USB_RESPONSES::OK, dt->len, (void*) dt->text);
 }
 Response cmd_prog_ready(void* data)
 {
@@ -65,6 +62,7 @@ Response cmd_power_on(void* data)
     {
         return Response{USB_RESPONSES::NOTREADY};
     }
+    printf("POWERING ON!\n");
     init_out({PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI}, false);
     init_out({PIN::POWER, PIN::HIGHVOLT}, false);
     sleep_us(10);
@@ -74,7 +72,7 @@ Response cmd_power_on(void* data)
     sleep_us(10);
     init_in(PIN::SDO);
     sleep_us(300);
-    hvp = std::make_unique<HVP>(progpio, PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI);
+    hvp = std::make_shared<HVP>(progpio, PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI);
     chippowered = true;
     return Response(USB_RESPONSES::OK);
 }
@@ -85,6 +83,7 @@ Response cmd_power_off(void* data)
         return Response(USB_RESPONSES::OK);
     }
     hvp = nullptr;
+    printf("POWERING OFF!\n");
     init_out({PIN::SDI, PIN::SII, PIN::SCI}, false);
     gpio_put(PIN::SCI, 0);
     gpio_put(PIN::SII, 0);
@@ -100,7 +99,7 @@ Response cmd_check(void* data)
     {
         return Response(USB_RESPONSES::NOTPOWERED);
     }
-    chip_desc = std::make_unique<ChipDesc>();
+    chip_desc = std::shared_ptr<ChipDesc>();
 
     // lock
     hvp->TX_RX(0b00001000, 0b01001100);
@@ -108,7 +107,7 @@ Response cmd_check(void* data)
     uint16 bits = hvp->TX_RX(0b00000000, 0b01111000);
     chip_desc->lock1 = !!(bits & (1 << 7));
     chip_desc->lock2 = !!(bits & (1 << 6));
-    
+    printf("lock1: %i\nlock2: %i\n", (int) chip_desc->lock1, (int)chip_desc->lock2);
     // signature
     hvp->TX_RX(0b00001000, 0b01001100);
     for(uint8 i = 0; i < 3; i++)
@@ -120,6 +119,7 @@ Response cmd_check(void* data)
         }
         uint16 v = hvp->TX_RX(0b0, 0b01101100);
         chip_desc->signature[i] = v & 0xFF;
+        printf("signature %i: %i\n", (int)i, (int) chip_desc->signature[i]);
     }
 
     // calibration
@@ -127,21 +127,25 @@ Response cmd_check(void* data)
     hvp->TX_RX(0b0, 0b00001100);
     hvp->TX_RX(0b0, 0b01111000);
     chip_desc->calibration = hvp->TX_RX(0b0, 0b01111100) & 0xFF;
+    printf("calibration: %i\n", (int) chip_desc->calibration);
 
     // fuses
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01101000);
     chip_desc->fuselow = hvp->TX_RX(0b0, 0b01111110) & 0xFF;
+    printf("fuselow: %i\n", (int) chip_desc->fuselow);
 
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01111010);
     chip_desc->fusehigh = hvp->TX_RX(0b0, 0b01101110) & 0xFF;
+    printf("fusehigh: %i\n", (int) chip_desc->fusehigh);
 
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01111000);
     chip_desc->fuseex = hvp->TX_RX(0b0, 0b01111100) & 0xFF;
+    printf("fusex: %i\n", (int) chip_desc->fuseex);
 
-    // parsing the sginature bytes
+    // parsing the signature bytes
 
     volatile uint32 signature = (*((uint32_t*)chip_desc->signature)) >> 8;
     for(uint i = 0; i < ArraySize(CHIPS::infos); i++)
@@ -150,15 +154,14 @@ Response cmd_check(void* data)
         if(info.signature == signature)
         {
             chip_desc->info = info;
-            signature = 0;
-            break;
+            goto foundchip;
         }
     }
-    if(signature != 0)
-    {
-        return Response(USB_RESPONSES::CHIPFAULT);
-    }
-
+    chip_desc = nullptr;
+    printf("invalid/unsupported chip signature %d!\n", (uint)signature);
+    return Response(USB_RESPONSES::CHIPFAULT);
+    foundchip:;
+    printf("Detected chip: %i\n", (int)chip_desc->info.id);
     return Response(USB_RESPONSES::OK, sizeof(ChipDesc), chip_desc.get());
 }
 Response cmd_chip_erase(void* data)
@@ -169,7 +172,7 @@ Response cmd_chip_erase(void* data)
 Response cmd_read_data(void* data)
 {
     auto cmd = (ReadData*)data;
-    if(cmd->len > 60)
+    if(cmd->len > 62)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
@@ -195,12 +198,54 @@ Response cmd_write_data(void* data)
 }
 Response cmd_read_hash_data(void* data)
 {
-    returnifnotsetup();
+    auto cmd = (HashData*)data;
+    if(cmd->address + cmd->len < cmd->address)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    struct __attribute__((__packed__))
+    {
+        uint64 hash=0;
+    }ret;
+    for(uint16 i = 0; i < cmd->len; i++)
+    {
+        ((uint8*)&ret.hash)[i % 8] ^= usbmemory[cmd->address + i];
+    }
+    return Response(USB_RESPONSES::OK, sizeof(ret), &ret);
+    
 }
 Response cmd_read_flash(void* data)
 {
     returnifnotsetup();
-
+    auto cmd = (ReadFlash*)data;
+    if(cmd->destination + cmd->npages*chip_desc->info.flash_page_bytes < cmd->destination)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    if(cmd->npages*chip_desc->info.flash_page_bytes > chip_desc->info.flash_bytes)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+    hvp->TX_RX(0b00000010, 0b01001100);
+    uint16 dest = cmd->destination;
+    for(uint16 i = 0; i < cmd->npages; i++ )
+    {
+        for(uint16 ii = 0; ii < chip_desc->info.flash_page_words; ii++)
+        {
+            hvp->TX_RX((cmd->startpage+i) & 0xFF, 0b00001100);
+            if(ii == 0)
+                hvp->TX_RX((!!((cmd->startpage+i) & 0x100)), 0b00011100);
+            hvp->TX_RX(0b0, 0b01101000);
+            uint8 l = hvp->TX_RX(0b0, 0b01101100);
+            hvp->TX_RX(0b0, 0b01111000);
+            uint8 h = hvp->TX_RX(0b0, 0b01111100);
+            usbmemory[dest] = h;
+            usbmemory[dest+1] = l;
+            dest += 2;
+            printf("%x  %x\n", h, l);
+        }
+    }
+    return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_flash(void* data)
 {
@@ -262,6 +307,7 @@ void usb_task()
         cmd_write_fuses
     };
     Response res;
+    printf("cmd: %i\n", (int)rcmd->rcmd);
     if(rcmd->rcmd >= fs.size())
     {
         res.errcode = (uint8_t) USB_RESPONSES::INVALID_COMMAND;
@@ -278,6 +324,9 @@ void usb_task()
         res.len = 0;
     }
     else 
+    {
         res = fs[rcmd->rcmd](data);
+    }
+    printf("res: %i\n", (int)res.errcode);
     usb_TX(res);
 }

@@ -33,21 +33,27 @@ class HVP
     }
     uint16 reverse16(uint16 in)
     {
-        return reverselookup[in & 0x00FF] | reverselookup[in >> 8];
+        return (reverselookup[in & 0x00FF] << 8) | reverselookup[in >> 8];
     }
     public:
-    uint16 TX_RX(uint8 _data, uint8 _instruction)
+    bool is_busy()
     {
-        uint32 rawdata = reverse8(_data);
-        uint32 instruction = reverse8(_instruction);
+        return gpio_get(sdo);
+    }
+    uint8 TX_RX(uint8 _data, uint8 _instruction)
+    {
+        uint32 rawdata = (_data);
+        uint32 instruction = (_instruction);
         uint32 data = 0;
-        if(sii+1 == sdi)
-            data = (rawdata << 11) | (instruction << 1); 
+        if(sii < sdi)
+            data = (rawdata << 8) | (instruction); 
         else
-            data = (instruction << 11) | (rawdata << 1); 
+            data = (instruction << 8) | (rawdata); 
         pio_sm_put_blocking(pio, sm, data);
         volatile uint32 ret = pio_sm_get_blocking(pio, sm);
-        return (ret & (uint32)0xFFFF);
+        printf("dt: %d\n", data);
+        printf("rt: %d\n", ret);
+        return (ret & (uint32)0xFF);
     }
     uint16 TX_NOOP()
     {
@@ -55,18 +61,9 @@ class HVP
     }
     HVP(PIO pio, uint8 sdi, uint8 sii, uint8 sdo, uint8 sci)
     {
-        int lpin, hpin;
-        if(sdi+1 == sii) // sdi and sii have to have neighbouring pin numbers.
-        {
-            hpin = sii;
-            lpin = sdi;
-        }
-        else if (sii+1 == sdi)
-        {
-            hpin = sdi;
-            lpin = sii;
-        }
-        else
+        int hpin = std::max(sdi, sii);
+        int lpin = std::min(sdi, sii);// sdi and sii have to have neighbouring pin numbers.
+        if(hpin == lpin || hpin-lpin != 1)
             assert(false);
         this->pio = pio;
         this->sdi = sdi;
@@ -74,7 +71,8 @@ class HVP
         this->sdo = sdo;
         this->sci = sci;
 
-
+        init_out({sdi, sii, sci}, false);
+        init_in(sdo, false, true);
 
         sm = pio_claim_unused_sm(pio, true);
 
@@ -88,17 +86,19 @@ class HVP
         // parameter to this function.
         sm_config_set_out_pins(&c, lpin, 2);
         sm_config_set_sideset_pins(&c, sci);
+        sm_config_set_out_shift(&c, false, false, false);
+        sm_config_set_in_pins(&c, sdo);
+        sm_config_set_in_shift(&c, false, false, false);
 
         pio_gpio_init(pio, sdi);
         pio_gpio_init(pio, sii);
         pio_gpio_init(pio, sci);
-        init_out(sdo, false);
 
-        gpio_set_dir(sdo, GPIO_OUT);
         // Set this pin's GPIO function (connect PIO to the pad)
         // Set the pin direction to output at the PIO
         pio_sm_set_consecutive_pindirs(pio, sm, lpin, 2, true);
-
+        pio_sm_set_consecutive_pindirs(pio, sm, sdo, 1, false);
+        pio_sm_set_clkdiv(pio, sm, CHIPS::HVP_CLKDIV);
         // Load our configuration, and jump to the start of the program
         pio_sm_init(pio, sm, offset, &c);
         // Set the state machine running
