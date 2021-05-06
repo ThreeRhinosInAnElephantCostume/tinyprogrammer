@@ -42,18 +42,43 @@ class HVP
     }
     uint8 TX_RX(uint8 _data, uint8 _instruction)
     {
-        uint32 rawdata = (_data);
-        uint32 instruction = (_instruction);
-        uint32 data = 0;
-        if(sii < sdi)
-            data = (rawdata << 8) | (instruction); 
-        else
-            data = (instruction << 8) | (rawdata); 
-        pio_sm_put_blocking(pio, sm, data);
-        volatile uint32 ret = pio_sm_get_blocking(pio, sm);
-        printf("dt: %d\n", data);
-        printf("rt: %d\n", ret);
-        return (ret & (uint32)0xFF);
+        uint8 rawdata = (_data);
+        uint8 instruction = (_instruction);
+        uint64 delay = 1;
+        uint16 ret = 0;
+        gpio_put(sdi, 0);
+        gpio_put(sii, 0);
+        gpio_put(sci, 1);
+        sleep_us(delay);
+        ret |= gpio_get(sdo);
+        gpio_put(sci, 0);
+        sleep_us(delay);
+        for(uint8 i = 0; i < 8; i++)
+        {
+            gpio_put(sdi, !!(rawdata & (1 << (7-i) )));
+            gpio_put(sii, !!(instruction & (1 << (7-i) )));
+            sleep_us(delay);
+            gpio_put(sci, 1);
+            sleep_us(delay);
+            ret <<= 1;
+            ret |= gpio_get(sdo);
+            gpio_put(sci, 0);
+            sleep_us(delay);
+        }
+        ret >>= 1;
+        gpio_put(sdi, 0);
+        gpio_put(sii, 0);
+        gpio_put(sci, 0);
+        for(uint8 i = 0; i < 2; i++)
+        {
+            sleep_us(delay);
+            gpio_put(sci, 1);
+            sleep_us(delay);
+            gpio_put(sci, 0);
+            sleep_us(delay);
+        }
+        //printf("r %i\n", (int)ret);
+        return ret;
     }
     uint16 TX_NOOP()
     {
@@ -70,43 +95,10 @@ class HVP
         this->sii = sii;
         this->sdo = sdo;
         this->sci = sci;
-
-        init_out({sdi, sii, sci}, false);
-        init_in(sdo, false, true);
-
-        sm = pio_claim_unused_sm(pio, true);
-
-        offset = pio_add_program(pio, &hvp_program);
-
-
-        
-        pio_sm_config c = hvp_program_get_default_config(offset);
-
-        // Map the state machine's OUT pin group to one pin, namely the `pin`
-        // parameter to this function.
-        sm_config_set_out_pins(&c, lpin, 2);
-        sm_config_set_sideset_pins(&c, sci);
-        sm_config_set_out_shift(&c, false, false, false);
-        sm_config_set_in_pins(&c, sdo);
-        sm_config_set_in_shift(&c, false, false, false);
-
-        pio_gpio_init(pio, sdi);
-        pio_gpio_init(pio, sii);
-        pio_gpio_init(pio, sci);
-
-        // Set this pin's GPIO function (connect PIO to the pad)
-        // Set the pin direction to output at the PIO
-        pio_sm_set_consecutive_pindirs(pio, sm, lpin, 2, true);
-        pio_sm_set_consecutive_pindirs(pio, sm, sdo, 1, false);
-        pio_sm_set_clkdiv(pio, sm, CHIPS::HVP_CLKDIV);
-        // Load our configuration, and jump to the start of the program
-        pio_sm_init(pio, sm, offset, &c);
-        // Set the state machine running
-        pio_sm_set_enabled(pio, sm, true);
     }
     ~HVP()
     {
-        pio_sm_set_enabled(pio, sm, false);
-        pio_sm_unclaim(pio, sm);
+        // pio_sm_set_enabled(pio, sm, false);
+        // pio_sm_unclaim(pio, sm);
     }
 };

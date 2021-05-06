@@ -1,7 +1,14 @@
 #include "hmain.hpp"
 #include "usbcomms.hpp"
 #define returnifnotsetup() if(!chippowered || !chip_desc) {return Response((!chippowered)? USB_RESPONSES::NOTPOWERED : USB_RESPONSES::NOTCHECKED);};
-
+void power_off()
+{
+    gpio_put(PIN::SCI, 0);
+    gpio_put(PIN::SII, 0);
+    gpio_put(PIN::SDI, 0);
+    gpio_put(PIN::HIGHVOLT, 0);
+    gpio_put(PIN::POWER, 0);
+}
 void usb_TX(Response res)
 {
     tud_vendor_write((void*)&res, sizeof(res));
@@ -57,22 +64,33 @@ Response cmd_chip_powered(void* data)
 Response cmd_power_on(void* data)
 {
     chip_erased = false;
-    hvp = nullptr;
+    hvp.reset();
     if(!is_power_safe)
     {
         return Response{USB_RESPONSES::NOTREADY};
     }
     printf("POWERING ON!\n");
-    init_out({PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI}, false);
-    init_out({PIN::POWER, PIN::HIGHVOLT}, false);
+    // init_out({PIN::SDI, PIN::SII, PIN::SCI}, false);
+    // init_in(PIN::SDO, false, true);
+    // init_out({PIN::POWER, PIN::HIGHVOLT}, false);
     sleep_us(10);
     gpio_put(PIN::POWER, true);
     sleep_us(20);
     gpio_put(PIN::HIGHVOLT, true);
-    sleep_us(10);
-    init_in(PIN::SDO);
     sleep_us(300);
     hvp = std::make_shared<HVP>(progpio, PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI);
+    // uint i = 0;
+    // while(!gpio_get(PIN::SDO))
+    // {
+    //     if(i > 5000)
+    //     {
+    //         power_off();
+    //         hvp.reset();
+    //         return Response(USB_RESPONSES::CHIPFAULT);
+    //     }
+    //     sleep_us(1);
+    //     i++;
+    // }
     chippowered = true;
     return Response(USB_RESPONSES::OK);
 }
@@ -82,14 +100,9 @@ Response cmd_power_off(void* data)
     {
         return Response(USB_RESPONSES::OK);
     }
-    hvp = nullptr;
+    hvp.reset();
     printf("POWERING OFF!\n");
-    init_out({PIN::SDI, PIN::SII, PIN::SCI}, false);
-    gpio_put(PIN::SCI, 0);
-    gpio_put(PIN::SII, 0);
-    gpio_put(PIN::SDI, 0);
-    gpio_put(PIN::HIGHVOLT, 0);
-    gpio_put(PIN::POWER, 0);
+    power_off();
     chippowered = false;
     return Response(USB_RESPONSES::OK);
 }
@@ -99,55 +112,54 @@ Response cmd_check(void* data)
     {
         return Response(USB_RESPONSES::NOTPOWERED);
     }
-    chip_desc = std::shared_ptr<ChipDesc>();
+    chip_desc = std::make_shared<ChipDesc>();
 
-    // lock
+    // signature
+    hvp->TX_RX(0b00001000, 0b01001100);
+    for(uint8 i = 0; i < 3; i++)
+    {
+        hvp->TX_RX(i, 0b00001100);
+        //if(i == 0) // fucking hell microchip, fix your documentation!
+        hvp->TX_RX(0b0, 0b01101000);
+        uint8 v = hvp->TX_RX(0b0, 0b01101100);
+        chip_desc->signature[i] = v;
+        printf("signature %i: %i\n", (int)i, (int) chip_desc->signature[i]);
+    }
+
+    //lock
     hvp->TX_RX(0b00001000, 0b01001100);
     hvp->TX_RX(0b00000000, 0b01111000);
     uint16 bits = hvp->TX_RX(0b00000000, 0b01111000);
     chip_desc->lock1 = !!(bits & (1 << 7));
     chip_desc->lock2 = !!(bits & (1 << 6));
     printf("lock1: %i\nlock2: %i\n", (int) chip_desc->lock1, (int)chip_desc->lock2);
-    // signature
-    hvp->TX_RX(0b00001000, 0b01001100);
-    for(uint8 i = 0; i < 3; i++)
-    {
-        hvp->TX_RX(i << 6, 0b00001100);
-        if(i == 0)
-        {
-            hvp->TX_RX(0b0, 0b01101000);
-        }
-        uint16 v = hvp->TX_RX(0b0, 0b01101100);
-        chip_desc->signature[i] = v & 0xFF;
-        printf("signature %i: %i\n", (int)i, (int) chip_desc->signature[i]);
-    }
 
-    // calibration
+    //calibration
     hvp->TX_RX(0b00001000, 0b01001100);
     hvp->TX_RX(0b0, 0b00001100);
     hvp->TX_RX(0b0, 0b01111000);
-    chip_desc->calibration = hvp->TX_RX(0b0, 0b01111100) & 0xFF;
+    chip_desc->calibration = hvp->TX_RX(0b0, 0b01111100);
     printf("calibration: %i\n", (int) chip_desc->calibration);
 
     // fuses
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01101000);
-    chip_desc->fuselow = hvp->TX_RX(0b0, 0b01111110) & 0xFF;
+    chip_desc->fuselow = hvp->TX_RX(0b0, 0b01111110);
     printf("fuselow: %i\n", (int) chip_desc->fuselow);
 
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01111010);
-    chip_desc->fusehigh = hvp->TX_RX(0b0, 0b01101110) & 0xFF;
+    chip_desc->fusehigh = hvp->TX_RX(0b0, 0b01101110);
     printf("fusehigh: %i\n", (int) chip_desc->fusehigh);
 
     hvp->TX_RX(0b00000100, 0b01001100);
     hvp->TX_RX(0b0, 0b01111000);
-    chip_desc->fuseex = hvp->TX_RX(0b0, 0b01111100) & 0xFF;
+    chip_desc->fuseex = hvp->TX_RX(0b0, 0b01111100);
     printf("fusex: %i\n", (int) chip_desc->fuseex);
 
     // parsing the signature bytes
-
-    volatile uint32 signature = (*((uint32_t*)chip_desc->signature)) >> 8;
+    printf(" %i %i %i\n", (int)chip_desc->signature[0], (int)chip_desc->signature[1], (int)chip_desc->signature[2]);
+    volatile uint32 signature = (chip_desc->signature[0] << 16) | (chip_desc->signature[1]  << 8) | (chip_desc->signature[2]);
     for(uint i = 0; i < ArraySize(CHIPS::infos); i++)
     {
         auto info = CHIPS::infos[i];
@@ -157,7 +169,7 @@ Response cmd_check(void* data)
             goto foundchip;
         }
     }
-    chip_desc = nullptr;
+    chip_desc.reset();
     printf("invalid/unsupported chip signature %d!\n", (uint)signature);
     return Response(USB_RESPONSES::CHIPFAULT);
     foundchip:;

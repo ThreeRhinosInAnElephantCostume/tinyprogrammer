@@ -1,4 +1,12 @@
 #include "hmain.hpp"
+float get_vbus()
+{
+    return adc_read_voltage(ADC::VBUSREAD, ADC::VBUSREAD_MP);
+}
+float get_vboost()
+{
+    return adc_read_voltage(ADC::BOOSTREAD, ADC::BOOSTREAD_MP) + ADC::BOOSTREAD_OFFSET;
+}
 void disable_power()
 {
     gpio_put(PIN::HIGHVOLT, 0);
@@ -14,12 +22,20 @@ void PANIC()
     gpio_put(PIN::HIGHVOLT, 0);
     gpio_put(PIN::POWER, 0);
     if(DEBUG)
+    {
         printf("PANIC!!\n");
-    watchdog_enable(0, false);
+        printf("\nV: %.4f\n", get_vboost());
+        printf("VBUS: %.4f\n", get_vbus());
+        printf("\nPANIC!!\n");
+}
+    if(!DEBUG)
+        watchdog_enable(0, false);
     while(true)
     {
         gpio_put(PIN::HIGHVOLT, 0);
         gpio_put(PIN::POWER, 0);
+        if(!DEBUG)
+            printf("PANIC!!\n");
     }
 }
 void safe_power()
@@ -40,7 +56,7 @@ void tick_power()
 {
     static int duty = BOOST::DEFAULT_DUTY;
     bool vbussafe = false;
-    float VBUSV = adc_read_voltage(ADC::VBUSREAD, ADC::VBUSREAD_MP);
+    float VBUSV = get_vbus();
     if(VBUSV > BOOST::VBUS_MAXIMUM)
     {
         unsafe_power(true);    
@@ -52,7 +68,7 @@ void tick_power()
     else 
         vbussafe = true;
     bool vboostsafe = false;
-    float V = adc_read_voltage(ADC::BOOSTREAD, ADC::BOOSTREAD_MP);
+    float V = get_vboost();
     if(V > BOOST::OVERVOLT || V < BOOST::UNDERVOLT)
     {
         unsafe_power(true);

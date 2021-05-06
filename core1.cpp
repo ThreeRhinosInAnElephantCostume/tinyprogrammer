@@ -2,7 +2,7 @@
 
 void core1_main()
 {
-    if constexpr(DEBUG)
+    if constexpr(!DEBUG)
         watchdog_enable(10, true);
     init_power_control();
     while(true)
@@ -20,7 +20,8 @@ void core1_main()
                 }
             }
         }
-        watchdog_update();
+        if constexpr(!DEBUG)
+            watchdog_update();
         tick_power();
     }
 }

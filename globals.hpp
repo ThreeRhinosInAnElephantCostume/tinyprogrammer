@@ -18,11 +18,13 @@ namespace ADC
 {
     constexpr uint8 BOOSTREAD = 0;
     constexpr float BOOSTREAD_MP = 10.0f/0.98912f;
+    constexpr float BOOSTREAD_OFFSET = -0.2f;
     constexpr uint8 VBUSREAD = 1;
     constexpr float VBUSREAD_MP = 2.5f;
 }
 namespace BOOST
 {
+    constexpr bool testpower = false;
     constexpr uint8 DIVIDER = 1;
     constexpr uint16 WRAP = 512;
     constexpr uint16 MAX_DUTY = WRAP*0.7;
@@ -37,6 +39,7 @@ namespace BOOST
     constexpr float MIN_SAFE = TARGET - 0.3f;
     constexpr float OVERVOLT = TARGET + 0.45f;
     constexpr float UNDERVOLT = TARGET - 0.45f;
+
 
     constexpr float VBUS_MAXIMUM = 5.4f;
     constexpr float VBUS_MINIMUM = 4.6f;

@@ -30,7 +30,7 @@ pico_set_program_version(tinyprogrammer "0.1")
 pico_enable_stdio_uart(tinyprogrammer 1)
 pico_enable_stdio_usb(tinyprogrammer 0)
 
-pico_generate_pio_header(tinyprogrammer ${CMAKE_CURRENT_LIST_DIR}/hvp.pio)
+#pico_generate_pio_header(tinyprogrammer ${CMAKE_CURRENT_LIST_DIR}/hvp.pio)
 
 target_include_directories(tinyprogrammer PRIVATE ${CMAKE_CURRENT_LIST_DIR})
 # Add the standard library to the build

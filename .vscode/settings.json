@@ -16,6 +16,7 @@
     "files.associations": {
       "string": "cpp",
       "functional": "cpp",
-      "cstring": "cpp"
+      "cstring": "cpp",
+      "random": "cpp"
     },
 }
