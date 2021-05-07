@@ -15,6 +15,7 @@ void power_off()
 }
 void usb_TX(Response res)
 {
+    static_assert(sizeof(Response) == 64);
     tud_vendor_write((void*)&res, sizeof(res));
 }
 void usb_TX(uint8_t errcode)
@@ -52,7 +53,7 @@ Response create_response(USB_RESPONSES errcode=USB_RESPONSES::OK, Ts... data)
 Response cmd_echo(void* data)
 {
     Echo* dt = (Echo*)data;
-    printf("echoing %s\n", dt->text);
+    //printf("echoing %s\n", dt->text);
     return Response(USB_RESPONSES::OK, dt->len, (void*) dt->text);
 }
 Response cmd_prog_ready(void* data)
@@ -74,27 +75,25 @@ Response cmd_power_on(void* data)
         return Response{USB_RESPONSES::NOTREADY};
     }
     printf("POWERING ON!\n");
-    // init_out({PIN::SDI, PIN::SII, PIN::SCI}, false);
-    // init_in(PIN::SDO, false, true);
-    // init_out({PIN::POWER, PIN::HIGHVOLT}, false);
+
     sleep_us(10);
     gpio_put(PIN::POWER, true);
     sleep_us(20);
     gpio_put(PIN::HIGHVOLT, true);
     sleep_us(300);
     hvp = std::make_shared<HVP>(progpio, PIN::SDI, PIN::SII, PIN::SDO, PIN::SCI);
-    // uint i = 0;
-    // while(!gpio_get(PIN::SDO))
-    // {
-    //     if(i > 5000)
-    //     {
-    //         power_off();
-    //         hvp.reset();
-    //         return Response(USB_RESPONSES::CHIPFAULT);
-    //     }
-    //     sleep_us(1);
-    //     i++;
-    // }
+    uint i = 0;
+    while(!gpio_get(PIN::SDO))
+    {
+        if(i > 5000)
+        {
+            power_off();
+            hvp.reset();
+            return Response(USB_RESPONSES::CHIPFAULT);
+        }
+        sleep_us(1);
+        i++;
+    }
     chippowered = true;
     return Response(USB_RESPONSES::OK);
 }
@@ -242,19 +241,21 @@ Response cmd_read_flash(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
-    hvp->TX_RX(0b00000010, 0b01001100);
     uint16 dest = cmd->destination;
     bool b = true;
     int si = 0;
-    for(uint16 i = cmd->startpage; i < cmd->npages; i++ )
+    hvp->TX_NOOP();
+    hvp->TX_RX(0b00000010, 0b01001100);
+    for(uint16 i = 0; i < cmd->npages; i++ )
     {
+        int page = cmd->startpage + i;
         for(uint16 ii = 0; ii < chip_desc->info.flash_page_words; ii++)
         {
-            uint16 addr = compute_address(i, ii);
-            printf("%i   %i     %i\n", (int)i, (int)ii, (int)addr);
+            uint16 addr = compute_address(page, ii);
+            //printf("%i   %i     %i\n", (int)page, (int)ii, (int)addr);
             hvp->TX_RX(addr & 0xFF, 0b00001100);
             if(ii == 0)
-                hvp->TX_RX((addr * 0xFF00) >> 8, 0b00011100);
+                hvp->TX_RX((addr & 0xFF00) >> 8, 0b00011100);
             hvp->TX_RX(0b0, 0b01101000);
             uint8 l = hvp->TX_RX(0b0, 0b01101100);
             hvp->TX_RX(0b0, 0b01111000);
@@ -264,7 +265,18 @@ Response cmd_read_flash(void* data)
             dest += 2;
             //printf("%x  %x\n", h, l);
         }
+        // for(uint8 w = 0; !gpio_get(PIN::SDO); w++)
+        // {
+        //     printf(".\n");
+        //     if(w > 100)
+        //     {
+        //         return Response(USB_RESPONSES::CHIPFAULT);
+        //     }
+        //     sleep_us(0);
+        // }
     }
+    hvp->TX_NOOP();
+    sleep_us(1);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_flash(void* data)

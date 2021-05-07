@@ -44,26 +44,37 @@ class HVP
     {
         uint8 rawdata = (_data);
         uint8 instruction = (_instruction);
-        uint64 delay = 1;
+        uint64 div = 1000*1000;
         uint16 ret = 0;
+        auto wait = [&](int mp = 1)
+        {   
+            uint clk = 133*1000*1000;
+            for(uint i =0; i < clk / (mp*div); i++)
+            {
+                i++;
+            }
+        };
+        while(!gpio_get(sdo));
+        wait();
         gpio_put(sdi, 0);
         gpio_put(sii, 0);
+        wait();
         gpio_put(sci, 1);
-        sleep_us(delay);
+        wait();
         ret |= gpio_get(sdo);
         gpio_put(sci, 0);
-        sleep_us(delay);
+        wait();
         for(uint8 i = 0; i < 8; i++)
         {
             gpio_put(sdi, !!(rawdata & (1 << (7-i) )));
             gpio_put(sii, !!(instruction & (1 << (7-i) )));
-            sleep_us(delay);
+            wait();
             gpio_put(sci, 1);
-            sleep_us(delay);
+            wait();
             ret <<= 1;
             ret |= gpio_get(sdo);
             gpio_put(sci, 0);
-            sleep_us(delay);
+            wait();
         }
         ret >>= 1;
         gpio_put(sdi, 0);
@@ -71,13 +82,11 @@ class HVP
         gpio_put(sci, 0);
         for(uint8 i = 0; i < 2; i++)
         {
-            sleep_us(delay);
+            wait();
             gpio_put(sci, 1);
-            sleep_us(delay);
+            wait();
             gpio_put(sci, 0);
-            sleep_us(delay);
         }
-        //printf("r %i\n", (int)ret);
         return ret;
     }
     uint16 TX_NOOP()

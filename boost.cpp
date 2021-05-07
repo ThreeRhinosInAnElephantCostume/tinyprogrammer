@@ -1,4 +1,9 @@
 #include "hmain.hpp"
+// declared globally for the purpose of debugging
+float VBUSV = 0.0f;
+float V = 0.0f;
+int duty = BOOST::DEFAULT_DUTY;
+
 float get_vbus()
 {
     return adc_read_voltage(ADC::VBUSREAD, ADC::VBUSREAD_MP);
@@ -24,8 +29,9 @@ void PANIC()
     if(DEBUG)
     {
         printf("PANIC!!\n");
-        printf("\nV: %.4f\n", get_vboost());
-        printf("VBUS: %.4f\n", get_vbus());
+        printf("\nV: %.4f\n", V);
+        printf("VBUS: %.4f\n", VBUSV);
+        printf("duty: %i\n", duty);
         printf("\nPANIC!!\n");
 }
     if(!DEBUG)
@@ -54,9 +60,8 @@ void unsafe_power(bool emergency=false)
 }
 void tick_power()
 {
-    static int duty = BOOST::DEFAULT_DUTY;
     bool vbussafe = false;
-    float VBUSV = get_vbus();
+    VBUSV = get_vbus();
     if(VBUSV > BOOST::VBUS_MAXIMUM)
     {
         unsafe_power(true);    
@@ -68,7 +73,7 @@ void tick_power()
     else 
         vbussafe = true;
     bool vboostsafe = false;
-    float V = get_vboost();
+    V = get_vboost();
     if(V > BOOST::OVERVOLT || V < BOOST::UNDERVOLT)
     {
         unsafe_power(true);
