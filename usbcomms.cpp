@@ -1,6 +1,10 @@
 #include "hmain.hpp"
 #include "usbcomms.hpp"
 #define returnifnotsetup() if(!chippowered || !chip_desc) {return Response((!chippowered)? USB_RESPONSES::NOTPOWERED : USB_RESPONSES::NOTCHECKED);};
+uint16 compute_address(uint16 page, uint16 word)
+{
+    return page * chip_desc->info.flash_page_words + word;
+}
 void power_off()
 {
     gpio_put(PIN::SCI, 0);
@@ -240,13 +244,17 @@ Response cmd_read_flash(void* data)
     }
     hvp->TX_RX(0b00000010, 0b01001100);
     uint16 dest = cmd->destination;
-    for(uint16 i = 0; i < cmd->npages; i++ )
+    bool b = true;
+    int si = 0;
+    for(uint16 i = cmd->startpage; i < cmd->npages; i++ )
     {
         for(uint16 ii = 0; ii < chip_desc->info.flash_page_words; ii++)
         {
-            hvp->TX_RX((cmd->startpage+i) & 0xFF, 0b00001100);
+            uint16 addr = compute_address(i, ii);
+            printf("%i   %i     %i\n", (int)i, (int)ii, (int)addr);
+            hvp->TX_RX(addr & 0xFF, 0b00001100);
             if(ii == 0)
-                hvp->TX_RX((!!((cmd->startpage+i) & 0x100)), 0b00011100);
+                hvp->TX_RX((addr * 0xFF00) >> 8, 0b00011100);
             hvp->TX_RX(0b0, 0b01101000);
             uint8 l = hvp->TX_RX(0b0, 0b01101100);
             hvp->TX_RX(0b0, 0b01111000);
@@ -254,7 +262,7 @@ Response cmd_read_flash(void* data)
             usbmemory[dest] = h;
             usbmemory[dest+1] = l;
             dest += 2;
-            printf("%x  %x\n", h, l);
+            //printf("%x  %x\n", h, l);
         }
     }
     return Response(USB_RESPONSES::OK);
