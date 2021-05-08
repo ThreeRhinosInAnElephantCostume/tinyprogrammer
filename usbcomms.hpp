@@ -44,7 +44,9 @@ enum class CMD
     READ_FUSES,
     WRITE_FUSES,
 
-
+    WRITE_LOCK,
+    
+    READ_CALIBRATION,
 };
 struct __attribute__((__packed__)) ChipDesc 
 {
@@ -105,20 +107,28 @@ struct __attribute__((__packed__)) WriteData : Command // up to 60 bytes at a ti
     uint16 address;
     uint8 len;
     uint8 data[60];
-
 };
-struct __attribute__((__packed__)) HashData : Command // up to 60 bytes at a time
+struct __attribute__((__packed__)) HashData : Command
 {
     uint16 address;
     uint8 len;
 };
-struct __attribute__((__packed__)) ReadFlash : Command // up to 60 bytes at a time
+struct __attribute__((__packed__)) RWPaged : Command 
 {
     uint16 startpage;
     uint16 npages;
-    uint16 destination;
+    uint16 memaddr;
 };
-
+struct __attribute__((__packed__)) WriteFuses : Command 
+{
+    uint8 low;
+    uint8 high;
+    uint8 extended;
+};
+struct __attribute__((__packed__)) WriteLock : Command 
+{
+    uint8 lock;
+};
 void usb_task();
 
 inline std::shared_ptr<HVP> hvp = nullptr; 
