@@ -1,9 +1,13 @@
 #include "hmain.hpp"
 #include "usbcomms.hpp"
 #define returnifnotsetup() if(!chippowered || !chip_desc) {return Response((!chippowered)? USB_RESPONSES::NOTPOWERED : USB_RESPONSES::NOTCHECKED);};
-uint16 compute_address(uint16 page, uint16 word)
+uint16 compute_flash_address(uint16 page, uint16 word)
 {
     return page * chip_desc->info.flash_page_words + word;
+}
+uint16 compute_eeprom_address(uint16 page, uint16 bt)
+{
+    return page * chip_desc->info.eeprom_page_bytes + bt;
 }
 void power_off()
 {
@@ -68,6 +72,8 @@ Response cmd_chip_powered(void* data)
 }
 Response cmd_power_on(void* data)
 {
+    if(chippowered)
+        return Response(USB_RESPONSES::OK);
     chip_erased = false;
     hvp.reset();
     if(!is_power_safe)
@@ -133,8 +139,8 @@ Response cmd_check(void* data)
     hvp->TX_RX(0b00001000, 0b01001100);
     hvp->TX_RX(0b00000000, 0b01111000);
     uint16 bits = hvp->TX_RX(0b00000000, 0b01111000);
-    chip_desc->lock1 = !!(bits & (1 << 7));
-    chip_desc->lock2 = !!(bits & (1 << 6));
+    chip_desc->lock1 = !!(bits & (1 << 0));
+    chip_desc->lock2 = !!(bits & (1 << 1));
     printf("lock1: %i\nlock2: %i\n", (int) chip_desc->lock1, (int)chip_desc->lock2);
 
     //calibration
@@ -182,7 +188,16 @@ Response cmd_check(void* data)
 Response cmd_chip_erase(void* data)
 {
     returnifnotsetup();
+    chip_erased = false;
+    hvp->TX_RX(0b10000000, 0b01001100);
+    hvp->TX_RX(0b0, 0b01100100);
+    hvp->TX_RX(0b0, 0b01101100);
+    int i = 0;
+    if(!hvp->wait_till_ready(100000))
+        return Response(USB_RESPONSES::CHIPFAULT);
+    hvp->TX_NOOP();
     chip_erased = true;
+    return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_data(void* data)
 {
@@ -232,8 +247,8 @@ Response cmd_read_hash_data(void* data)
 Response cmd_read_flash(void* data)
 {
     returnifnotsetup();
-    auto cmd = (ReadFlash*)data;
-    if(cmd->destination + cmd->npages*chip_desc->info.flash_page_bytes < cmd->destination)
+    auto cmd = (RWPaged*)data;
+    if(cmd->memaddr + cmd->npages*chip_desc->info.flash_page_bytes < cmd->memaddr)
     {
         return Response(USB_RESPONSES::INVALID_RANGE);
     }
@@ -241,7 +256,7 @@ Response cmd_read_flash(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
-    uint16 dest = cmd->destination;
+    uint16 dest = cmd->memaddr;
     bool b = true;
     int si = 0;
     hvp->TX_NOOP();
@@ -251,8 +266,7 @@ Response cmd_read_flash(void* data)
         int page = cmd->startpage + i;
         for(uint16 ii = 0; ii < chip_desc->info.flash_page_words; ii++)
         {
-            uint16 addr = compute_address(page, ii);
-            //printf("%i   %i     %i\n", (int)page, (int)ii, (int)addr);
+            uint16 addr = compute_flash_address(page, ii);
             hvp->TX_RX(addr & 0xFF, 0b00001100);
             if(ii == 0)
                 hvp->TX_RX((addr & 0xFF00) >> 8, 0b00011100);
@@ -260,20 +274,10 @@ Response cmd_read_flash(void* data)
             uint8 l = hvp->TX_RX(0b0, 0b01101100);
             hvp->TX_RX(0b0, 0b01111000);
             uint8 h = hvp->TX_RX(0b0, 0b01111100);
-            usbmemory[dest] = h;
-            usbmemory[dest+1] = l;
+            usbmemory[dest] = l;
+            usbmemory[dest+1] = h;
             dest += 2;
-            //printf("%x  %x\n", h, l);
         }
-        // for(uint8 w = 0; !gpio_get(PIN::SDO); w++)
-        // {
-        //     printf(".\n");
-        //     if(w > 100)
-        //     {
-        //         return Response(USB_RESPONSES::CHIPFAULT);
-        //     }
-        //     sleep_us(0);
-        // }
     }
     hvp->TX_NOOP();
     sleep_us(1);
@@ -284,26 +288,196 @@ Response cmd_write_flash(void* data)
     returnifnotsetup();
     if(!chip_erased)
         return Response(USB_RESPONSES::NOTERASED);
+    auto cmd = (RWPaged*)data;
+    if(cmd->memaddr + cmd->npages*chip_desc->info.flash_page_bytes < cmd->memaddr)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    if(cmd->npages*chip_desc->info.flash_page_bytes > chip_desc->info.flash_bytes)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+    uint16 source = cmd->memaddr;
+    hvp->TX_NOOP();
+    hvp->TX_RX(0b0010000, 0b01001100);
+    for(int i = 0; i < cmd->npages; i++)
+    {
+        uint16 addr = 0;
+        for(int ii = 0; ii < chip_desc->info.flash_page_words;ii++)
+        {
+            addr = compute_flash_address(i+cmd->startpage, ii);
+            hvp->TX_RX(addr & 0xFF, 0b00001100);
+            hvp->TX_RX(usbmemory[source], 0b00101100);
+            hvp->TX_RX(usbmemory[source+1], 0b00111100);
+            hvp->TX_RX(0b0, 0b01111101);
+            hvp->TX_RX(0b0, 0b01111100);
+            source += 2;
+        }
+        hvp->TX_RX((addr & 0xFF00) >> 8, 0b00011100);
+        hvp->TX_RX(0b0, 0b01100100);
+        hvp->TX_RX(0b0, 0b01101100);
+        if(!hvp->wait_till_ready(10000))
+            return Response(USB_RESPONSES::CHIPFAULT);
+    }
+    hvp->TX_NOOP();
+    sleep_us(1);
+    return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_eeprom(void* data)
 {
     returnifnotsetup();
+    auto cmd = (RWPaged*) data;
+
+    if(cmd->memaddr + cmd->npages*chip_desc->info.eeprom_page_bytes < cmd->memaddr)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    if(cmd->npages*chip_desc->info.eeprom_page_bytes > chip_desc->info.eeprom_bytes)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+
+    uint16 dest = cmd->memaddr;
+    hvp->TX_NOOP();
+    hvp->TX_RX(0b0000011, 0b01001100);
+
+    for(uint i = 0; i < cmd->npages; i++)
+    {
+        for(uint ii = 0; ii < chip_desc->info.eeprom_page_bytes; ii++)
+        {
+            uint16 addr = compute_eeprom_address(i, ii);
+            hvp->TX_RX(addr & 0xFF, 0b00001100);
+            if(ii == 0)
+                hvp->TX_RX(addr >> 8, 0b00011100);
+            hvp->TX_RX(0b0, 0b01101000);
+            uint8 v = hvp->TX_RX(0b0, 0b01101100);
+            usbmemory[dest] = v;
+            dest++;
+        }
+    }
+    hvp->TX_NOOP();
+    return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_eeprom(void* data)
 {
     returnifnotsetup();
     if(!chip_erased)
         return Response(USB_RESPONSES::NOTERASED);
+
+    auto cmd = (RWPaged*) data;
+
+    if(cmd->memaddr + cmd->npages*chip_desc->info.flash_page_bytes < cmd->memaddr)
+    {
+        return Response(USB_RESPONSES::INVALID_RANGE);
+    }
+    if(cmd->npages*chip_desc->info.flash_page_bytes > chip_desc->info.flash_bytes)
+    {
+        return Response(USB_RESPONSES::INVALID_ARGUMENT);
+    }
+
+    uint16 source = cmd->memaddr;
+    hvp->TX_NOOP();
+    hvp->TX_RX(0b00010001, 0b01001100);
+
+    for(uint i = 0; i < cmd->npages; i++)
+    {
+        for(uint ii = 0; ii < chip_desc->info.eeprom_page_bytes; ii++)
+        {
+            uint16 addr = compute_eeprom_address(i, ii);
+            hvp->TX_RX(addr & 0xFF, 0b00001100);
+            hvp->TX_RX(addr >> 8, 0b00011100);
+            hvp->TX_RX(usbmemory[source], 0b01101101);
+            hvp->TX_RX(0b0, 0b01100100);
+            hvp->TX_RX(0b0, 0b01101100);
+            if(!hvp->wait_till_ready(5000))
+                return Response(USB_RESPONSES::CHIPFAULT);
+            source++;
+        }
+    }
+    hvp->TX_NOOP();
+    return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_fuses(void* data)
 {
     returnifnotsetup();
+    struct
+    {
+        uint8 low;
+        uint8 high;
+        uint8 extended;
+    }ret = {0};
+    // fuses
+    hvp->TX_RX(0b00000100, 0b01001100);
+    hvp->TX_RX(0b0, 0b01101000);
+    ret.low = hvp->TX_RX(0b0, 0b01111110);
+
+    hvp->TX_RX(0b00000100, 0b01001100);
+    hvp->TX_RX(0b0, 0b01111010);
+    ret.high = hvp->TX_RX(0b0, 0b01101110);
+
+    hvp->TX_RX(0b00000100, 0b01001100);
+    hvp->TX_RX(0b0, 0b01111000);
+    ret.extended = hvp->TX_RX(0b0, 0b01111100);
+
+    return Response(USB_RESPONSES::OK, sizeof(ret), &ret);
 }
 Response cmd_write_fuses(void* data)
 {
     returnifnotsetup();
-}
+    if(!chip_erased)
+        return Response(USB_RESPONSES::NOTERASED);
+    auto cmd = (WriteFuses*)data;
+    hvp->TX_RX(0b01000000, 0b01001100);
+    hvp->TX_RX(cmd->low, 0b00101100);
+    hvp->TX_RX(0b0, 0b01100100);
+    hvp->TX_RX(0b0, 0b01101100);
+    if(!hvp->wait_till_ready(5000))
+        return Response(USB_RESPONSES::CHIPFAULT);
 
+    hvp->TX_RX(0b01000000, 0b01001100);
+    hvp->TX_RX(cmd->low, 0b00101100);
+    hvp->TX_RX(0b0, 0b01110100);
+    hvp->TX_RX(0b0, 0b01111100);
+    if(!hvp->wait_till_ready(5000))
+        return Response(USB_RESPONSES::CHIPFAULT);
+
+    hvp->TX_RX(0b01000000, 0b01001100);
+    hvp->TX_RX(cmd->extended, 0b00101100);
+    hvp->TX_RX(0b0, 0b01100110);
+    hvp->TX_RX(0b0, 0b01101110);
+    if(!hvp->wait_till_ready(5000))
+        return Response(USB_RESPONSES::CHIPFAULT);
+    
+    return Response(USB_RESPONSES::OK);
+}
+Response cmd_write_lock(void* data)
+{
+    returnifnotsetup();
+    if(!chip_erased)
+        return Response(USB_RESPONSES::NOTERASED);
+    auto cmd = (WriteLock*)data;
+    hvp->TX_RX(0b00100000, 0b01001100);
+    hvp->TX_RX(cmd->lock, 0b00101100);
+    hvp->TX_RX(0b0, 0b01100100);
+    hvp->TX_RX(0b0, 0b01101100);
+    if(!hvp->wait_till_ready(5000))
+        return Response(USB_RESPONSES::CHIPFAULT);
+    
+    return Response(USB_RESPONSES::OK);
+}
+Response cmd_read_calibration(void* data)
+{
+    returnifnotsetup();
+    hvp->TX_RX(0b00001000, 0b01001100);
+    hvp->TX_RX(0b0, 0b00001100);
+    hvp->TX_RX(0b0, 0b01111000);
+    uint8 ret = hvp->TX_RX(0b0, 0b01111100);
+    return Response(USB_RESPONSES::OK, 1, &ret);
+}
+Response cmd_was_erased(void* data)
+{
+    return Response(USB_RESPONSES::OK, 1, &chip_erased);
+}
 void usb_task()
 {
     if(!tud_vendor_available())
@@ -336,7 +510,13 @@ void usb_task()
         cmd_write_eeprom,
 
         cmd_read_fuses,
-        cmd_write_fuses
+        cmd_write_fuses,
+
+        cmd_write_lock,
+
+        cmd_read_calibration,
+
+        cmd_was_erased
     };
     Response res;
     printf("cmd: %i\n", (int)rcmd->rcmd);

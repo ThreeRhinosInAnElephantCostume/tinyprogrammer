@@ -38,7 +38,19 @@ class HVP
     public:
     bool is_busy()
     {
-        return gpio_get(sdo);
+        return !gpio_get(sdo);
+    }
+    bool wait_till_ready(uint timeoutus = 1000)
+    {
+        int i = 0;
+        while(is_busy())
+        {
+            if(i > timeoutus)
+                return false;
+            sleep_us(1);
+            i++;
+        }
+        return true;
     }
     uint8 TX_RX(uint8 _data, uint8 _instruction)
     {

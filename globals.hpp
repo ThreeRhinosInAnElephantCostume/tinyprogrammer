@@ -76,13 +76,18 @@ namespace CHIPS
         uint16 eeprom_bytes;
         uint8 eeprom_page_bytes;
         uint8 eeprom_page_num;
+
+        char strname[16];
         ChipInfo()
         {
 
         }
-        ChipInfo(CHIP_ID id, uint signature, uint8 word_bytes, uint16 flash_words, uint16 flash_page_words, 
+        ChipInfo(const char* strname, CHIP_ID id, uint signature, uint8 word_bytes, uint16 flash_words, uint16 flash_page_words, 
             uint8 eeprom_page_bytes, uint8 eeprom_page_num)
         {
+            assert(strlen(strname) <= 16);
+            strcpy(this->strname, strname);
+            
             this->signature = signature;
             this->id = id;
             this->word_bytes = word_bytes;
@@ -100,9 +105,9 @@ namespace CHIPS
     };
     inline ChipInfo infos[] = 
     {
-        {CHIP_ID::ATTINY25, 0x1E9108, 2, 1024, 16, 4, 32},
-        {CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
-        {CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
+        {"attiny25", CHIP_ID::ATTINY25, 0x1E9108, 2, 1024, 16, 4, 32},
+        {"attiny45", CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
+        {"attiny85", CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
     };
 }
 

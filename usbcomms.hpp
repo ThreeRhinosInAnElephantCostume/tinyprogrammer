@@ -45,8 +45,10 @@ enum class CMD
     WRITE_FUSES,
 
     WRITE_LOCK,
-    
+
     READ_CALIBRATION,
+
+    WAS_ERASED
 };
 struct __attribute__((__packed__)) ChipDesc 
 {
@@ -111,7 +113,7 @@ struct __attribute__((__packed__)) WriteData : Command // up to 60 bytes at a ti
 struct __attribute__((__packed__)) HashData : Command
 {
     uint16 address;
-    uint8 len;
+    uint16 len;
 };
 struct __attribute__((__packed__)) RWPaged : Command 
 {
