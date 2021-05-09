@@ -197,6 +197,7 @@ Response cmd_chip_erase(void* data)
         return Response(USB_RESPONSES::CHIPFAULT);
     hvp->TX_NOOP();
     chip_erased = true;
+    printf("chip erased\n");
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_data(void* data)
@@ -210,6 +211,7 @@ Response cmd_read_data(void* data)
     {
         return Response(USB_RESPONSES::INVALID_RANGE);
     }
+    printf("read %i bytes from usbmemory\n", (int)cmd->len);
     return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address);
 }
 Response cmd_write_data(void* data)
@@ -224,6 +226,7 @@ Response cmd_write_data(void* data)
         return Response(USB_RESPONSES::INVALID_RANGE);
     }
     memcpy(usbmemory + cmd->address, cmd->data, cmd->len);
+    printf("written %i bytes from usbmemory\n", (int)cmd->len);
     return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address); // return for potential validation
 }
 Response cmd_read_hash_data(void* data)
@@ -241,8 +244,8 @@ Response cmd_read_hash_data(void* data)
     {
         ((uint8*)&ret.hash)[i % 8] ^= usbmemory[cmd->address + i];
     }
+    printf("hashed %i bytes of data: %ulli\n", (int)cmd->len, ret.hash);
     return Response(USB_RESPONSES::OK, sizeof(ret), &ret);
-    
 }
 Response cmd_read_flash(void* data)
 {
@@ -281,6 +284,7 @@ Response cmd_read_flash(void* data)
     }
     hvp->TX_NOOP();
     sleep_us(1);
+    printf("read %i pages from flash\n", (int)cmd->npages);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_flash(void* data)
@@ -321,6 +325,7 @@ Response cmd_write_flash(void* data)
     }
     hvp->TX_NOOP();
     sleep_us(1);
+    printf("written %i pages from flash\n", (int)cmd->npages);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_eeprom(void* data)
@@ -356,6 +361,7 @@ Response cmd_read_eeprom(void* data)
         }
     }
     hvp->TX_NOOP();
+    printf("read %i pages from eeprom\n", (int)cmd->npages);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_eeprom(void* data)
@@ -395,6 +401,7 @@ Response cmd_write_eeprom(void* data)
         }
     }
     hvp->TX_NOOP();
+    printf("written %i pages from eeprom\n", (int)cmd->npages);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_fuses(void* data)
@@ -419,13 +426,13 @@ Response cmd_read_fuses(void* data)
     hvp->TX_RX(0b0, 0b01111000);
     ret.extended = hvp->TX_RX(0b0, 0b01111100);
 
+    printf("read fuses l%i h%i e%i\n", (int)ret.low, (int)ret.high, (int)ret.extended);
+
     return Response(USB_RESPONSES::OK, sizeof(ret), &ret);
 }
 Response cmd_write_fuses(void* data)
 {
     returnifnotsetup();
-    if(!chip_erased)
-        return Response(USB_RESPONSES::NOTERASED);
     auto cmd = (WriteFuses*)data;
     hvp->TX_RX(0b01000000, 0b01001100);
     hvp->TX_RX(cmd->low, 0b00101100);
@@ -435,7 +442,7 @@ Response cmd_write_fuses(void* data)
         return Response(USB_RESPONSES::CHIPFAULT);
 
     hvp->TX_RX(0b01000000, 0b01001100);
-    hvp->TX_RX(cmd->low, 0b00101100);
+    hvp->TX_RX(cmd->high, 0b00101100);
     hvp->TX_RX(0b0, 0b01110100);
     hvp->TX_RX(0b0, 0b01111100);
     if(!hvp->wait_till_ready(5000))
@@ -448,6 +455,7 @@ Response cmd_write_fuses(void* data)
     if(!hvp->wait_till_ready(5000))
         return Response(USB_RESPONSES::CHIPFAULT);
     
+    printf("set fuses to l%i h%i e%i\n", (int)cmd->low, (int)cmd->high, (int)cmd->extended);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_write_lock(void* data)
@@ -463,6 +471,7 @@ Response cmd_write_lock(void* data)
     if(!hvp->wait_till_ready(5000))
         return Response(USB_RESPONSES::CHIPFAULT);
     
+    printf("written lock byte %i\n", (int)cmd->lock);
     return Response(USB_RESPONSES::OK);
 }
 Response cmd_read_calibration(void* data)
@@ -472,6 +481,8 @@ Response cmd_read_calibration(void* data)
     hvp->TX_RX(0b0, 0b00001100);
     hvp->TX_RX(0b0, 0b01111000);
     uint8 ret = hvp->TX_RX(0b0, 0b01111100);
+
+    printf("read calibration byte %i\n", (int)ret);
     return Response(USB_RESPONSES::OK, 1, &ret);
 }
 Response cmd_was_erased(void* data)
@@ -539,6 +550,6 @@ void usb_task()
     {
         res = fs[rcmd->rcmd](data);
     }
-    printf("res: %i\n", (int)res.errcode);
+    printf("received command %i, responded with %i with len %i\n", (int)rcmd->rcmd, (int)res.errcode, (int)res.len);
     usb_TX(res);
 }

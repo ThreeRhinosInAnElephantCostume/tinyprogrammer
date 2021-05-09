@@ -109,6 +109,31 @@ namespace CHIPS
         {"attiny45", CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
         {"attiny85", CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
     };
+    enum class PROG_STATUS
+    {
+        GENERICERROR,
+        POWERFAILURE,
+        STARTING,
+        READY,
+        READING,
+        WRITING,
+    };
+    struct LEDConfig
+    {
+        PROG_STATUS status;
+        uint8 red;
+        uint8 green;
+        uint8 blue;
+    };
+    inline LEDConfig led_configs[]=
+    {
+        {PROG_STATUS::GENERICERROR, 200, 100, 0},
+        {PROG_STATUS::POWERFAILURE, 255, 50, 50},
+        {PROG_STATUS::STARTING, 100, 100, 255},
+        {PROG_STATUS::READY, 100, 255, 100},
+        {PROG_STATUS::READING, 255, 255, 255},
+        {PROG_STATUS::WRITING, 200, 100, 255},
+    };
 }
 
 
