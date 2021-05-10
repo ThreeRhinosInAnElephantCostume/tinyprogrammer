@@ -16,6 +16,9 @@ void power_off()
     gpio_put(PIN::SDI, 0);
     gpio_put(PIN::HIGHVOLT, 0);
     gpio_put(PIN::POWER, 0);
+    if(hvp.get())
+        hvp.reset();
+    chippowered = false;
 }
 void usb_TX(Response res)
 {
@@ -62,7 +65,7 @@ Response cmd_echo(void* data)
 }
 Response cmd_prog_ready(void* data)
 {
-    return Response(USB_RESPONSES::OK, 1, &is_power_safe);
+    return Response(USB_RESPONSES::OK, 1, &ispowersafe);
 }
 Response cmd_chip_powered(void* data)
 {
@@ -76,7 +79,7 @@ Response cmd_power_on(void* data)
         return Response(USB_RESPONSES::OK);
     chip_erased = false;
     hvp.reset();
-    if(!is_power_safe)
+    if(!ispowersafe)
     {
         return Response{USB_RESPONSES::NOTREADY};
     }
@@ -95,7 +98,6 @@ Response cmd_power_on(void* data)
         if(i > 5000)
         {
             power_off();
-            hvp.reset();
             return Response(USB_RESPONSES::CHIPFAULT);
         }
         sleep_us(1);
@@ -111,7 +113,6 @@ Response cmd_power_off(void* data)
         return Response(USB_RESPONSES::OK);
     }
     set_led_mode(LED::PROG_STATUS::GENERICWORK);
-    hvp.reset();
     printf("POWERING OFF!\n");
     power_off();
     chippowered = false;
@@ -555,7 +556,7 @@ bool usb_task()
         res.errcode = (uint8) USB_RESPONSES::FAILURE;
         res.len = 0;
     }
-    else if(!is_power_safe)
+    else if(!ispowersafe)
     {
         res.errcode = (uint8) USB_RESPONSES::NOTREADY;
         res.len = 0;

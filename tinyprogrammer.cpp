@@ -33,7 +33,7 @@ int main()
     printpower = true;
     multicore_launch_core1(core1_main);
 
-    while(!is_power_safe || BOOST::testpower);
+    while(!ispowersafe || BOOST::testpower);
     printpower = false;
     sleep_us(1000);
     puts("\nstarting tinyprogrammer\n");
@@ -59,7 +59,19 @@ int main()
         }
         else if((gettime()-lastup) > LED::RETURN_TO_READY_US)
         {
-            set_led_mode(LED::PROG_STATUS::READY);
+            if(chippowered)
+            {
+                if((gettime()-lastup) > CHIPS::CHIP_MAX_IDLE_US)
+                {
+                    power_off();
+                    printf("Shuting down the chip after excessive inactivity");
+                    if constexpr(DEBUG)
+                        gracefulfailure();
+                }
+                set_led_mode(LED::PROG_STATUS::STILLPOWERED);
+            }
+            else 
+                set_led_mode(LED::PROG_STATUS::READY);
         }
     }
 

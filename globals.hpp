@@ -54,6 +54,7 @@ namespace MULTICORE
 }
 namespace CHIPS
 {
+    constexpr uint64 CHIP_MAX_IDLE_US = 10 * 1000 * 1000;
     constexpr float HVP_CLKDIV = 50.0f;
     enum class CHIP_ID
     {
@@ -125,6 +126,7 @@ namespace LED
         READING,
         WRITING,
         GENERICWORK,
+        STILLPOWERED
     };
     struct Config
     {
@@ -141,11 +143,12 @@ namespace LED
     {
         {PROG_STATUS::GENERICERROR, 200, 200, 0},
         {PROG_STATUS::POWERFAILURE, 200, 30, 30},
-        {PROG_STATUS::STARTING, 100, 100, 255},
+        {PROG_STATUS::STARTING, 50, 50, 250},
         {PROG_STATUS::READY, 10, 125, 10},
         {PROG_STATUS::READING, 255, 255, 255},
         {PROG_STATUS::WRITING, 200, 0, 255},
         {PROG_STATUS::GENERICWORK, 0, 150, 150},
+        {PROG_STATUS::STILLPOWERED, 0, 0, 200},
     };
 }
 
@@ -153,7 +156,7 @@ namespace LED
 inline uint8_t usbmemory[1 << 16];
 
 
-inline bool is_power_safe = false;
+inline bool ispowersafe = false;
 inline float boostvoltage = 0.0f;
 
 inline bool chippowered = false;

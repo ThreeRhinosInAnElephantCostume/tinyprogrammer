@@ -46,11 +46,11 @@ void PANIC()
 }
 void safe_power()
 {
-    is_power_safe = true;
+    ispowersafe = true;
 }
 void unsafe_power(bool emergency=false)
 {
-    is_power_safe = false;
+    ispowersafe = false;
     if(emergency && chippowered)
     {
         PANIC();
@@ -113,7 +113,7 @@ void tick_power()
             printf("VBUS: %.3f\n", VBUSV);
             printf("duty: %i\n", duty);
             printf("change: %i\n", change);
-            printf("is_power_safe: %s\n", (is_power_safe)? "true": "false");
+            printf("ispowersafe: %s\n", (ispowersafe)? "true": "false");
         }
     }
 

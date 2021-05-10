@@ -138,3 +138,4 @@ inline std::shared_ptr<ChipDesc> chip_desc = nullptr;
 inline bool chip_erased = false;
 
 bool usb_task();
+void power_off();
