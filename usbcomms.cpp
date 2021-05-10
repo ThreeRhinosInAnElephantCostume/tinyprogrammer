@@ -81,6 +81,7 @@ Response cmd_power_on(void* data)
         return Response{USB_RESPONSES::NOTREADY};
     }
     printf("POWERING ON!\n");
+    set_led_mode(LED::PROG_STATUS::GENERICWORK);
 
     sleep_us(10);
     gpio_put(PIN::POWER, true);
@@ -109,6 +110,7 @@ Response cmd_power_off(void* data)
     {
         return Response(USB_RESPONSES::OK);
     }
+    set_led_mode(LED::PROG_STATUS::GENERICWORK);
     hvp.reset();
     printf("POWERING OFF!\n");
     power_off();
@@ -121,6 +123,7 @@ Response cmd_check(void* data)
     {
         return Response(USB_RESPONSES::NOTPOWERED);
     }
+    set_led_mode(LED::PROG_STATUS::GENERICWORK);
     chip_desc = std::make_shared<ChipDesc>();
 
     // signature
@@ -188,6 +191,7 @@ Response cmd_check(void* data)
 Response cmd_chip_erase(void* data)
 {
     returnifnotsetup();
+    set_led_mode(LED::PROG_STATUS::WRITING);
     chip_erased = false;
     hvp->TX_RX(0b10000000, 0b01001100);
     hvp->TX_RX(0b0, 0b01100100);
@@ -211,6 +215,7 @@ Response cmd_read_data(void* data)
     {
         return Response(USB_RESPONSES::INVALID_RANGE);
     }
+    set_led_mode(LED::PROG_STATUS::READING);
     printf("read %i bytes from usbmemory\n", (int)cmd->len);
     return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address);
 }
@@ -225,12 +230,14 @@ Response cmd_write_data(void* data)
     {
         return Response(USB_RESPONSES::INVALID_RANGE);
     }
+    set_led_mode(LED::PROG_STATUS::WRITING);
     memcpy(usbmemory + cmd->address, cmd->data, cmd->len);
     printf("written %i bytes from usbmemory\n", (int)cmd->len);
     return Response(USB_RESPONSES::OK, cmd->len, usbmemory + cmd->address); // return for potential validation
 }
 Response cmd_read_hash_data(void* data)
 {
+    set_led_mode(LED::PROG_STATUS::READING);
     auto cmd = (HashData*)data;
     if(cmd->address + cmd->len < cmd->address)
     {
@@ -259,6 +266,7 @@ Response cmd_read_flash(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
+    set_led_mode(LED::PROG_STATUS::READING);
     uint16 dest = cmd->memaddr;
     bool b = true;
     int si = 0;
@@ -301,6 +309,7 @@ Response cmd_write_flash(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
+    set_led_mode(LED::PROG_STATUS::WRITING);
     uint16 source = cmd->memaddr;
     hvp->TX_NOOP();
     hvp->TX_RX(0b0010000, 0b01001100);
@@ -341,6 +350,7 @@ Response cmd_read_eeprom(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
+    set_led_mode(LED::PROG_STATUS::READING);
 
     uint16 dest = cmd->memaddr;
     hvp->TX_NOOP();
@@ -380,6 +390,7 @@ Response cmd_write_eeprom(void* data)
     {
         return Response(USB_RESPONSES::INVALID_ARGUMENT);
     }
+    set_led_mode(LED::PROG_STATUS::WRITING);
 
     uint16 source = cmd->memaddr;
     hvp->TX_NOOP();
@@ -407,6 +418,7 @@ Response cmd_write_eeprom(void* data)
 Response cmd_read_fuses(void* data)
 {
     returnifnotsetup();
+    set_led_mode(LED::PROG_STATUS::READING);
     struct
     {
         uint8 low;
@@ -433,6 +445,7 @@ Response cmd_read_fuses(void* data)
 Response cmd_write_fuses(void* data)
 {
     returnifnotsetup();
+    set_led_mode(LED::PROG_STATUS::WRITING);
     auto cmd = (WriteFuses*)data;
     hvp->TX_RX(0b01000000, 0b01001100);
     hvp->TX_RX(cmd->low, 0b00101100);
@@ -461,6 +474,7 @@ Response cmd_write_fuses(void* data)
 Response cmd_write_lock(void* data)
 {
     returnifnotsetup();
+    set_led_mode(LED::PROG_STATUS::WRITING);
     if(!chip_erased)
         return Response(USB_RESPONSES::NOTERASED);
     auto cmd = (WriteLock*)data;
@@ -477,6 +491,7 @@ Response cmd_write_lock(void* data)
 Response cmd_read_calibration(void* data)
 {
     returnifnotsetup();
+    set_led_mode(LED::PROG_STATUS::READING);
     hvp->TX_RX(0b00001000, 0b01001100);
     hvp->TX_RX(0b0, 0b00001100);
     hvp->TX_RX(0b0, 0b01111000);
@@ -489,10 +504,10 @@ Response cmd_was_erased(void* data)
 {
     return Response(USB_RESPONSES::OK, 1, &chip_erased);
 }
-void usb_task()
+bool usb_task()
 {
     if(!tud_vendor_available())
-        return;
+        return false;
     uint8_t data[64];
     tud_vendor_read(&data, 64);
     Command* rcmd = (Command*)data;
@@ -530,7 +545,6 @@ void usb_task()
         cmd_was_erased
     };
     Response res;
-    printf("cmd: %i\n", (int)rcmd->rcmd);
     if(rcmd->rcmd >= fs.size())
     {
         res.errcode = (uint8_t) USB_RESPONSES::INVALID_COMMAND;
@@ -550,6 +564,10 @@ void usb_task()
     {
         res = fs[rcmd->rcmd](data);
     }
-    printf("received command %i, responded with %i with len %i\n", (int)rcmd->rcmd, (int)res.errcode, (int)res.len);
+    if(DEBUG || res.errcode != (int)USB_RESPONSES::OK)
+    {
+        printf("received command %i, responded with %i with len %i\n", (int)rcmd->rcmd, (int)res.errcode, (int)res.len);
+    }
     usb_TX(res);
+    return true;
 }

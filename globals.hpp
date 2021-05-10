@@ -1,8 +1,7 @@
 #pragma once
 #include "hmain.hpp"
 
-#define DEBUG 1
-
+#define DEBUG (1)
 
 namespace PIN
 {
@@ -10,9 +9,14 @@ namespace PIN
     constexpr uint8 SDI = 15;
     constexpr uint8 SII = 14;
     constexpr uint8 SDO = 12;
+
     constexpr uint8 POWER = 16;
     constexpr uint8 PULSE = 13;
     constexpr uint8 HIGHVOLT = 18;
+
+    constexpr uint8 RED = 9;
+    constexpr uint8 GREEN = 8;
+    constexpr uint8 BLUE = 7;
 }
 namespace ADC
 {
@@ -109,6 +113,9 @@ namespace CHIPS
         {"attiny45", CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
         {"attiny85", CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
     };
+}
+namespace LED
+{
     enum class PROG_STATUS
     {
         GENERICERROR,
@@ -117,22 +124,28 @@ namespace CHIPS
         READY,
         READING,
         WRITING,
+        GENERICWORK,
     };
-    struct LEDConfig
+    struct Config
     {
         PROG_STATUS status;
         uint8 red;
         uint8 green;
         uint8 blue;
     };
-    inline LEDConfig led_configs[]=
+    constexpr uint16 WRAP = 254;
+    constexpr uint16 OFFSET = 0;
+    constexpr uint8 CLOCK_DIV = 255;
+    constexpr uint64 RETURN_TO_READY_US = 4 * 100 * 1000;
+    inline Config configs[]=
     {
-        {PROG_STATUS::GENERICERROR, 200, 100, 0},
-        {PROG_STATUS::POWERFAILURE, 255, 50, 50},
+        {PROG_STATUS::GENERICERROR, 200, 200, 0},
+        {PROG_STATUS::POWERFAILURE, 200, 30, 30},
         {PROG_STATUS::STARTING, 100, 100, 255},
-        {PROG_STATUS::READY, 100, 255, 100},
+        {PROG_STATUS::READY, 10, 125, 10},
         {PROG_STATUS::READING, 255, 255, 255},
-        {PROG_STATUS::WRITING, 200, 100, 255},
+        {PROG_STATUS::WRITING, 200, 0, 255},
+        {PROG_STATUS::GENERICWORK, 0, 150, 150},
     };
 }
 

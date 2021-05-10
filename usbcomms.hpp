@@ -131,9 +131,10 @@ struct __attribute__((__packed__)) WriteLock : Command
 {
     uint8 lock;
 };
-void usb_task();
 
 inline std::shared_ptr<HVP> hvp = nullptr; 
 inline std::shared_ptr<ChipDesc> chip_desc = nullptr;
 
 inline bool chip_erased = false;
+
+bool usb_task();

@@ -131,5 +131,4 @@ void init_power_control()
     pwm_set_gpio_level(PIN::PULSE, BOOST::DEFAULT_DUTY);
     pwm_set_clkdiv_int_frac(slice_num, BOOST::DIVIDER, 0);
     pwm_set_enabled(slice_num, true);
-    
 }
