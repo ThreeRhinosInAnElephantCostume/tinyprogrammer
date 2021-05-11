@@ -64,7 +64,7 @@ int main()
                 if((gettime()-lastup) > CHIPS::CHIP_MAX_IDLE_US)
                 {
                     power_off();
-                    printf("Shuting down the chip after excessive inactivity");
+                    printf("Shuting down the chip after excessive inactivity\n");
                     if constexpr(DEBUG)
                         gracefulfailure();
                 }
