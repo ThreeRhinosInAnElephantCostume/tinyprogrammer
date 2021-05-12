@@ -1,7 +1,7 @@
 #pragma once
 #include "hmain.hpp"
 
-#define DEBUG (1)
+#define DEBUG (0)
 
 namespace PIN
 {
