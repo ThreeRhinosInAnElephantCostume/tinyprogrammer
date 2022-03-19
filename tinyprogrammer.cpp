@@ -69,13 +69,13 @@ int main()
         bool execcmd = usb_task();
         if(execcmd)
         {
-            lastup = gettime();
+            lastup = get_time_us();
         }
-        else if((gettime()-lastup) > LED::RETURN_TO_READY_US)
+        else if((get_time_us()-lastup) > LED::RETURN_TO_READY_US)
         {
             if(chippowered)
             {
-                if((gettime()-lastup) > CHIPS::CHIP_MAX_IDLE_US)
+                if((get_time_us()-lastup) > CHIPS::CHIP_MAX_IDLE_US)
                 {
                     power_off();
                     printf("Shuting down the chip after excessive inactivity\n");

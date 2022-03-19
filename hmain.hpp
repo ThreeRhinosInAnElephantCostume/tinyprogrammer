@@ -14,7 +14,7 @@
 
 #pragma once
 #include "includes.hpp"
-#include "pico/MyPicoLib.hpp"
+#include "MyPicoLib/MyPicoLib.hpp"
 #include "globals.hpp"
 #include "hvp.hpp"
 #include "usbcomms.hpp"

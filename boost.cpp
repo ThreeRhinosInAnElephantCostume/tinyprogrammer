@@ -98,7 +98,7 @@ void tick_power()
     }
     else
         vboostsafe = true;
-    if(vboostsafe && vbussafe && gettime() > 1000*1000)
+    if(vboostsafe && vbussafe && get_time_us() > 1000*1000)
         safe_power();
     boostvoltage = V;
     uint16_t change = std::min(BOOST::MAXCHANGE,

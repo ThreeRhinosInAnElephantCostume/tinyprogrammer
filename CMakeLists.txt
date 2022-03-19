@@ -10,7 +10,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # initalize pico_sdk from installed location
 # (note this can come from environment, CMake cache etc)
-set(PICO_SDK_PATH "/home/ubuntu/pico/pico-sdk")
+set(PICO_SDK_PATH "/home/pi/pico/pico-sdk")
 
 # Pull in Pico SDK (must be before project)
 include(pico_sdk_import.cmake)

@@ -1,0 +1,3 @@
+[submodule "MyPicoLib"]
+	path = MyPicoLib
+	url = ./MyPicoLib/
