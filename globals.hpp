@@ -70,12 +70,13 @@ namespace CHIPS
 {
     constexpr uint64 CHIP_MAX_IDLE_US = 10 * 1000 * 1000;
     constexpr float HVP_CLKDIV = 50.0f;
-    enum class CHIP_ID
+    enum class CHIP_ID : uint8
     {
         ERR,
         ATTINY25,
         ATTINY45,
-        ATTINY85
+        ATTINY85,
+        ATTINY13A,
     };
     struct __attribute__((__packed__)) ChipInfo
     {
@@ -127,6 +128,7 @@ namespace CHIPS
         {"attiny25", CHIP_ID::ATTINY25, 0x1E9108, 2, 1024, 16, 4, 32},
         {"attiny45", CHIP_ID::ATTINY45, 0x1E9206, 2, 2048, 32, 4, 64},
         {"attiny85", CHIP_ID::ATTINY85, 0x1E930B, 2, 4096, 32, 4, 128},
+        {"attiny13", CHIP_ID::ATTINY13A, 0x1E9007, 2, 512, 16, 4, 16},
     };
 }
 namespace LED
